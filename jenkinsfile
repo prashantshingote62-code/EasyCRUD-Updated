@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Clone Repo') {
+            steps {
+                git url: "https://github.com/prashantshingote62-code/EasyCRUD-Updated", branch: "main"
+            }
+        }
+
+        stage('Build Frontend Image') {
+            steps {
+                sh "docker build -t prashantshingote/easycrud2-jenkins:frontend ./frontend"
+            }
+        }
+
+        stage('Build Backend Image') {
+            steps {
+                sh "docker build --no-cache -t prashantshingote/easycrud2-jenkins:backend ./backend"
+            }
+        }
+
+        stage('Docker Hub Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+                    sh '''
+                        echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Frontend Image to Docker Hub') {
+            steps {
+                sh "docker push prashantshingote/easycrud2-jenkins:frontend"
+            }
+        }
+
+        stage('Push Backend Image to Docker Hub') {
+            steps {
+                sh "docker push prashantshingote/easycrud2-jenkins:backend"
+            }
+        }
+
+        stage('Run Frontend Container') {
+            steps {
+                sh '''
+                    docker rm -f easycrud1-frontend || true
+                    docker run -d --name easycrud1-frontend -p 80:80 prashantshingote/easycrud2-jenkins:frontend
+                '''
+            }
+        }
+
+        stage('Run Backend Container') {
+            steps {
+                sh '''
+                    docker rm -f easycrud1-backend || true
+                    docker run -d --name easycrud1-backend -p 5000:8080 prashantshingote/easycrud2-jenkins:backend
+                '''
+            }
+        }
+    }
+}
